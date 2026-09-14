@@ -118,10 +118,10 @@ def format_nippo_message(nippo_data):
         for w in workers:
             company = w.get("company", "不明")
             job_type = w.get("job_type", "")
-            foreman = w.get("foreman", 0) or 0
-            skilled = w.get("skilled", 0) or 0
-            apprentice = w.get("apprentice", 0) or 0
-            total = w.get("total", 0) or 0
+            foreman = int(str(w.get("foreman", 0) or 0))
+            skilled = int(str(w.get("skilled", 0) or 0))
+            apprentice = int(str(w.get("apprentice", 0) or 0))
+            total = int(str(w.get("total", 0) or 0))
             work_cat = w.get("work_category", "")
             desc = w.get("description", "")
             company_line = str(company)
@@ -134,7 +134,7 @@ def format_nippo_message(nippo_data):
                 if desc:
                     detail = detail + "：" + str(desc)
                 lines.append(detail)
-            total_workers = total_workers + total
+            total_workers = total_workers + int(str(total))
         lines.append("")
         lines.append("合計：" + str(total_workers) + "人工")
 
