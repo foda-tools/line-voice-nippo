@@ -1,15 +1,20 @@
 import requests
 from config import LINE_CHANNEL_ACCESS_TOKEN
+from services.whisper_service import process_voice_message
 
 def handle_message(event):
     message_type = event["message"]["type"]
     reply_token = event["replyToken"]
     user_id = event["source"]["userId"]
     if message_type == "audio":
-        reply_text = """音声メッセージを受信しました！
+        message_id = event["message"]["id"]
+        transcribed_text = process_voice_message(message_id)
+        reply_text = """音声を認識しました！
 
-日報に変換中...
-（この機能はPhase 2で実装されます）"""
+【認識結果】
+""" + transcribed_text + """
+
+（Phase 3で日報フォーマットに自動変換されます）"""
         send_reply(reply_token, reply_text)
     elif message_type == "text":
         text = event["message"]["text"]
