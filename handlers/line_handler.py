@@ -1,6 +1,7 @@
 import requests
 from config import LINE_CHANNEL_ACCESS_TOKEN
 from services.whisper_service import process_voice_message
+from services.gpt_service import convert_to_nippo, format_nippo_message
 
 def handle_message(event):
     message_type = event["message"]["type"]
@@ -9,12 +10,11 @@ def handle_message(event):
     if message_type == "audio":
         message_id = event["message"]["id"]
         transcribed_text = process_voice_message(message_id)
-        reply_text = """音声を認識しました！
-
-【認識結果】
-""" + transcribed_text + """
-
-（Phase 3で日報フォーマットに自動変換されます）"""
+        if transcribed_text.startswith("音声"):
+            send_reply(reply_token, transcribed_text)
+            return
+        nippo_data = convert_to_nippo(transcribed_text)
+        reply_text = format_nippo_message(nippo_data)
         send_reply(reply_token, reply_text)
     elif message_type == "text":
         text = event["message"]["text"]
