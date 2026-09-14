@@ -71,7 +71,7 @@ def convert_to_nippo(transcribed_text):
 
     try:
         result = response.json()
-        content = result["choices"]["message"]["content"]
+        content = result["choices"][0]["message"]["content"]
         content = content.strip()
         if content.startswith("```"):
             split_lines = content.split(NEWLINE)
