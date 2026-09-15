@@ -4,7 +4,7 @@ from datetime import datetime
 
 NEWLINE = chr(10)
 SPREADSHEET_ID = "1F1BFp7PZ1Q6jyiudxkDLXPHB5Ij5GgM6nVuzgzQ3x28"
-SHEET_NAME = "シート1"
+SHEET_NAME = "Sheet1"
 
 def get_token():
     try:
