@@ -138,5 +138,3 @@ def get_monthly_summary(user_id):
     except Exception as e:
         print("Summary error: " + str(e))
         return "集計エラーが発生しました。もう一度お試しください。"
-
-    💡
