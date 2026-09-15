@@ -2,6 +2,7 @@ import requests
 from config import LINE_CHANNEL_ACCESS_TOKEN
 from services.whisper_service import process_voice_message
 from services.gpt_service import convert_to_nippo, format_nippo_message
+from services.data_service import save_nippo, get_monthly_summary
 
 def handle_message(event):
     message_type = event["message"]["type"]
@@ -14,6 +15,8 @@ def handle_message(event):
             send_reply(reply_token, transcribed_text)
             return
         nippo_data = convert_to_nippo(transcribed_text)
+        if nippo_data is not None:
+            save_nippo(user_id, nippo_data)
         reply_text = format_nippo_message(nippo_data)
         send_reply(reply_token, reply_text)
     elif message_type == "text":
@@ -34,8 +37,7 @@ def handle_text_command(text, user_id):
 【コマンド一覧】
 ・「ヘルプ」→ この画面
 ・「今月の集計」→ 月次サマリー
-・「ステータス」→ 接続状態確認
-・「修正」→ 直前の日報を修正"""
+・「ステータス」→ 接続状態確認"""
     elif text == "ステータス":
         return """LINE音声日報ツール v1.0
 
@@ -44,15 +46,14 @@ BOT接続：正常
 
 ユーザーID：""" + user_id[:8] + "..."
     elif text == "今月の集計":
-        return "月次集計機能はPhase 4で実装されます。"
-    elif text.startswith("修正"):
-        return "修正機能はPhase 3で実装されます。"
+        return get_monthly_summary(user_id)
     else:
         return """以下のコマンドが使えます：
 
 音声メッセージ → 日報作成
 「ヘルプ」→ 使い方
-「ステータス」→ 接続確認"""
+「ステータス」→ 接続確認
+「今月の集計」→ 月次サマリー"""
 
 def send_reply(reply_token, text):
     url = "https://api.line.me/v2/bot/message/reply"
