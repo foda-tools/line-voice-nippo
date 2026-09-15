@@ -40,7 +40,7 @@ def get_monthly_summary(user_id):
             continue
         if not filename.endswith(".json"):
             continue
-        date_part = filename.split("_") if "_" in filename else ""
+        date_part = filename.split("_")[0] if "_" in filename else ""
         if not date_part.startswith(current_month):
             continue
         filepath = DATA_DIR + "/" + filename
