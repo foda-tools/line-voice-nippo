@@ -1,42 +1,47 @@
 import json
 import os
-import gspread
-from google.oauth2.service_account import Credentials
 from datetime import datetime
 
 NEWLINE = chr(10)
 SPREADSHEET_ID = "1F1BFp7PZ1Q6jyiudxkDLXPHB5Ij5GgM6nVuzgzQ3x28"
+SHEET_NAME = "シート1"
 
-def get_sheet():
-    creds_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
-    if not os.path.exists(creds_file):
-        creds_json = os.environ.get("GOOGLE_CREDENTIALS", "")
-        if creds_json:
-            creds_file = "/tmp/credentials.json"
-            with open(creds_file, "w") as f:
-                f.write(creds_json)
-        else:
-            print("No credentials found")
-            return None
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-    return sheet
+def get_token():
+    try:
+        creds_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
+        if not os.path.exists(creds_file):
+            creds_json = os.environ.get("GOOGLE_CREDENTIALS", "")
+            if creds_json:
+                creds_file = "/tmp/credentials.json"
+                with open(creds_file, "w") as f:
+                    f.write(creds_json)
+            else:
+                print("No credentials found")
+                return None
+        from google.oauth2.service_account import Credentials
+        from google.auth.transport.requests import Request
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
+        creds.refresh(Request())
+        return creds.token
+    except Exception as e:
+        print("Auth error: " + str(e))
+        return None
 
 def save_nippo(user_id, nippo_data):
     try:
-        sheet = get_sheet()
-        if sheet is None:
-            print("Sheet connection failed")
+        import requests as req
+        token = get_token()
+        if token is None:
+            print("Token failed")
             return None
         date_val = str(nippo_data.get("date", ""))
         weather = str(nippo_data.get("weather", ""))
         temp = str(nippo_data.get("temperature", ""))
         workers = nippo_data.get("workers", [])
+        rows = []
         if not workers:
-            row = [date_val, weather, temp, "", "", "", "", "", "", "", ""]
-            sheet.append_row(row)
+            rows.append([date_val, weather, temp, "", "", "", "", "", "", "", ""])
         else:
             for w in workers:
                 row = [
@@ -52,19 +57,36 @@ def save_nippo(user_id, nippo_data):
                     str(w.get("work_category", "")),
                     str(w.get("description", ""))
                 ]
-                sheet.append_row(row)
-        return "saved"
+                rows.append(row)
+        url = "https://sheets.googleapis.com/v4/spreadsheets/" + SPREADSHEET_ID + "/values/" + SHEET_NAME + ":append?valueInputOption=USER_ENTERED"
+        headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
+        body = {"values": rows}
+        response = req.post(url, headers=headers, json=body)
+        if response.status_code == 200:
+            print("Saved to sheets!")
+            return "saved"
+        else:
+            print("Sheets error: " + str(response.status_code) + " - " + response.text)
+            return None
     except Exception as e:
         print("Save error: " + str(e))
         return None
 
 def get_monthly_summary(user_id):
     try:
-        sheet = get_sheet()
-        if sheet is None:
+        import requests as req
+        token = get_token()
+        if token is None:
             return "スプレッドシートに接続できませんでした。"
-        all_data = sheet.get_all_records()
-        if not all_data:
+        url = "https://sheets.googleapis.com/v4/spreadsheets/" + SPREADSHEET_ID + "/values/" + SHEET_NAME
+        headers = {"Authorization": "Bearer " + token}
+        response = req.get(url, headers=headers)
+        if response.status_code != 200:
+            print("Read error: " + str(response.status_code))
+            return "スプレッドシートの読み取りに失敗しました。"
+        data = response.json()
+        all_rows = data.get("values", [])
+        if len(all_rows) <= 1:
             return "今月の日報データがまだありません。音声で日報を送ってください。"
         now = datetime.now()
         current_month = now.strftime("%Y/%m")
@@ -72,27 +94,31 @@ def get_monthly_summary(user_id):
         dates_set = set()
         weather_stats = {}
         companies = {}
-        ky_done_count = 0
-        ky_total_count = 0
-        for row in all_data:
-            date_val = str(row.get("日付", ""))
+        zero = int(chr(48))
+        one = int(chr(49))
+        three = int(chr(51))
+        eight = int(chr(56))
+        for row in all_rows[one:]:
+            if len(row) < (eight + one):
+                continue
+            date_val = str(row[zero])
             if not date_val.startswith(current_month):
                 continue
             dates_set.add(date_val)
-            weather = str(row.get("天候", ""))
+            weather = str(row[one]) if len(row) > one else ""
             if weather:
-                weather_stats[weather] = weather_stats.get(weather, 0) + 1
-            total_val = row.get("合計人工", 0)
+                weather_stats[weather] = weather_stats.get(weather, zero) + one
+            total_val = row[eight] if len(row) > eight else "0"
             try:
                 total_val = int(str(total_val))
             except Exception:
-                total_val = 0
+                total_val = zero
             total_workers = total_workers + total_val
-            company = str(row.get("会社名", ""))
+            company = str(row[three]) if len(row) > three else ""
             if company:
-                companies[company] = companies.get(company, 0) + total_val
+                companies[company] = companies.get(company, zero) + total_val
         total_days = len(dates_set)
-        if total_days == 0:
+        if total_days == zero:
             return "今月の日報データがまだありません。音声で日報を送ってください。"
         lines = []
         lines.append("--- " + now.strftime("%Y年%m月") + " 月次サマリー ---")
@@ -112,3 +138,5 @@ def get_monthly_summary(user_id):
     except Exception as e:
         print("Summary error: " + str(e))
         return "集計エラーが発生しました。もう一度お試しください。"
+
+    💡
